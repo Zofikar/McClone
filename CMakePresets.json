@@ -1,0 +1,43 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux-clang",
+      "displayName": "Linux Clang (Base)",
+      "description": "Standard Linux build using Clang",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-clang",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "WARNINGS_AS_ERRORS": "ON",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF"
+      }
+    },
+    {
+      "name": "windows-clang",
+      "displayName": "Windows Cross-Compile",
+      "description": "Cross-compile to Windows using Clang/MinGW",
+      "inherits": "linux-clang",
+      "binaryDir": "${sourceDir}/build/windows-clang",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_NAME": "Windows",
+        "CMAKE_SYSTEM_PROCESSOR": "x86_64",
+        "CMAKE_C_COMPILER_TARGET": "x86_64-w64-mingw32",
+        "CMAKE_CXX_COMPILER_TARGET": "x86_64-w64-mingw32",
+        "CMAKE_LINKER": "lld-link"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-clang",
+      "configurePreset": "linux-clang"
+    },
+    {
+      "name": "windows-clang",
+      "configurePreset": "windows-clang"
+    }
+  ]
+}

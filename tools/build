@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+import argparse
+import pathlib
+import subprocess
+import sys
+
+BASE_PATH = pathlib.Path(__file__).parent.parent.resolve()
+APPS_PATH = BASE_PATH / "Apps"
+LIBS_PATH = BASE_PATH / "Libs"
+
+IMAGE_NAME = "McCloneBuilder".lower()
+IMAGE_VERSION = "0.0.1"
+
+GITHUB_USER = "Zofikar".lower()
+REPOSITORY_NAME = "McClone".lower()
+
+IMAGE_TAG = f"{IMAGE_NAME}:{IMAGE_VERSION}"
+FULL_IMAGE = f"ghcr.io/{GITHUB_USER}/{REPOSITORY_NAME}/{IMAGE_TAG}"
+DOCKERFILE = BASE_PATH / "Docker" / "Dockerfile"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Project build and automation tool")
+    parser.add_argument("--docker", help=None, action='store_true')
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Top-level commands")
+
+    docker_parser = subparsers.add_parser("docker", help="Docker related operations")
+    docker_subparsers = docker_parser.add_subparsers(dest="subcommand", required=True, help="Docker subcommands")
+
+    docker_subparsers.add_parser("build", help="Build the docker image")
+    docker_subparsers.add_parser("push", help="Push the docker image")
+
+    format_parser = subparsers.add_parser("format", help="Code formatting operations")
+    format_subparsers = format_parser.add_subparsers(dest="subcommand", required=True, help="Format subcommands")
+
+    format_subparsers.add_parser("fix", help="Fix formatting issues automatically")
+    format_subparsers.add_parser("check", help="Check for formatting issues")
+
+    config_parser = subparsers.add_parser("config", help="Configure the project using a preset")
+    config_parser.add_argument("preset", type=str, help="The preset profile to use for building")
+    tidy_parser = subparsers.add_parser("tidy", help="Tidy the project using a preset")
+    tidy_parser.add_argument("preset", type=str, help="The preset profile to use for building")
+    build_parser = subparsers.add_parser("build", help="Build the project using a preset")
+    build_parser.add_argument("preset", type=str, help="The preset profile to use for building")
+
+    args = parser.parse_args()
+    return args
+
+
+def run_command(command: list[str]):
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        sys.exit(e.returncode)
+
+
+def run_in_docker():
+    ensure_docker()
+    command = ["docker", "run", "--rm", "-v", f"{str(BASE_PATH)}:/workspace", FULL_IMAGE, "./tools/build", "--docker",
+               *(sys.argv[1:])]
+    run_command(command)
+
+
+def build_docker():
+    if not DOCKERFILE.exists():
+        raise FileNotFoundError(f"Could not find Dockerfile at {str(DOCKERFILE)}")
+    command = ["docker", "build", "-f", str(DOCKERFILE), "-t", FULL_IMAGE, str(BASE_PATH)]
+    run_command(command)
+
+
+def push_docker():
+    build_docker()
+    command = ["docker", "push", FULL_IMAGE]
+    run_command(command)
+
+
+def ensure_docker():
+    check_local = subprocess.run(
+        ["docker", "image", "inspect", FULL_IMAGE],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    if check_local.returncode == 0:
+        return
+
+    pull_attempt = subprocess.run(["docker", "pull", FULL_IMAGE])
+    if pull_attempt.returncode == 0:
+        return
+
+    build_docker()
+
+
+EXTENSIONS = ("*.c", "*.h", "*.cpp", "*.hpp", "*.cxx", "*.hxx")
+
+
+def get_project_files():
+    return [f for ext in EXTENSIONS for f in APPS_PATH.rglob(ext)] + [f for ext in EXTENSIONS for f in
+                                                                      LIBS_PATH.rglob(ext)]
+
+def run_format():
+    for file in get_project_files():
+        print(f"Running format for {str(file)}")
+        run_command(["clang-format", "-i", str(file)])
+
+
+def run_tidy(preset: str):
+    build_dir = BASE_PATH / "build" / preset
+    if not (build_dir / "compile_commands.json").exists():
+        print("No compile_commands.json found, run config first.")
+        return
+    for file in get_project_files():
+        print(f"Running tidy for {str(file)}")
+        run_command(["clang-tidy", str(file), "--fix", "-p", str(build_dir)])
+
+
+def run_config(preset: str):
+    run_command(["cmake", "--preset", preset])
+
+
+def run_build(preset: str):
+    run_command(["cmake", "--build", "--preset", preset])
+
+
+def run_format_check():
+    run_format()
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        stdout=subprocess.PIPE,
+    )
+    if result.returncode != 0 or result.stdout:
+        changed = result.stdout.decode()
+        print(f"Following files changed after format:\n{changed}")
+        sys.exit(1)
+
+
+def main():
+    args = parse_args()
+
+    if args.command == "docker":
+        if args.subcommand == "build":
+            build_docker()
+        elif args.subcommand == "push":
+            push_docker()
+    elif not args.docker:
+        run_in_docker()
+    elif args.command == "format":
+        if args.subcommand == "fix":
+            run_format()
+        elif args.subcommand == "check":
+            run_format_check()
+
+    elif args.command == "config":
+        run_config(args.preset)
+    elif args.command == "tidy":
+        run_tidy(args.preset)
+    elif args.command == "build":
+        run_build(args.preset)
+
+
+if __name__ == '__main__':
+    main()

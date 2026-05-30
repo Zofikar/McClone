@@ -1,0 +1,45 @@
+Checks: "-*,\
+  bugprone-*,\
+  -bugprone-easily-swappable-parameters,\
+  cppcoreguidelines-*,\
+  -cppcoreguidelines-avoid-magic-numbers,\
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,\
+  -cppcoreguidelines-pro-type-vararg,\
+  modernize-*,\
+  -modernize-use-trailing-return-type,\
+  performance-*,\
+  readability-*,\
+  -readability-magic-numbers,\
+  -readability-named-parameter,\
+  readability-qualified-auto,\
+  misc-const-correctness,\
+  clang-analyzer-*"
+
+WarningsAsErrors: "*"
+
+CheckOptions:
+  - key: readability-const-return-type.IgnoreMacros
+    value: "true"
+  - key: misc-const-correctness.WarnPointersAsValues
+    value: "true"
+  - key: misc-const-correctness.TransformPointersAsValues
+    value: "true"
+  - key: readability-qualified-auto.AddConstToQualified
+    value: "true"
+
+  - key: llvm-include-order.IncludeBlocks
+    value: Regroup
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'
+
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: "true"
+
+  - key: modernize-use-default-member-init.UseAssignment
+    value: "false"
+  - key: modernize-pass-by-value.IncludeStyle
+    value: google
+
+FormatStyle: file
+
+HeaderFilterRegex: "^(src|include)/"
